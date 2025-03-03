@@ -11,6 +11,9 @@ The **Jellyfin Audio Language Tagger** is a Python script designed to parse your
 - **Debug Mode:** Provides detailed output during processing.
 - **Configurable:** Easily extendable language settings for adding support for additional languages.
 
+## Example Screen
+![Colored Terminal Output](screen-dry-run.png)
+
 ## Requirements
 
 - **Python 3**  
@@ -42,6 +45,7 @@ The **Jellyfin Audio Language Tagger** is a Python script designed to parse your
    - After running the script, open your Jellyfin web interface.
    - Navigate to your library’s menu (using the three dots).
    - Click **"Refresh metadata"** and then **"Scan for new and updated files"** to load the new tags.
+   - You can now filter media by "tags" and "Deutsch"/"German"
 
 ## Extending for Other Languages
 

@@ -131,11 +131,15 @@ def process_video_file(filepath, dry_run=False, debug=False, language='de'):
         nfo_path = os.path.join(os.path.dirname(filepath), "movie.nfo")
         for tag in tags_to_add:
             update_nfo(nfo_path, tag, dry_run, debug)
+        print(f"{COLOR_GREEN}{readable_name} media found in {filepath}{COLOR_RESET}")
     else:
-        if debug:
-            print(f"{COLOR_RED}No {readable_name} media found in {filepath}{COLOR_RESET}")
+        print(f"{COLOR_RED}No {readable_name} media found in {filepath}{COLOR_RESET}")
 
 def main(args):
+    if args.dry_run:
+        print(f"{COLOR_ORANGE}===== Dry-Run, this will not write anything. ====={COLOR_RESET}")
+    else:
+        print(f"{COLOR_ORANGE}===== Hot-Run, this will write tags to movie.nfo files. ====={COLOR_RESET}")
     for root_dir, dirs, files in os.walk(args.path):
         for filename in files:
             ext = os.path.splitext(filename)[1].lower()

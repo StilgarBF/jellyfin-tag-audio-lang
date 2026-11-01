@@ -1,77 +1,81 @@
 # Jellyfin Audio Language Tagger
 
-The **Jellyfin Audio Language Tagger** is a Python script designed to parse your video library and automatically add language-specific tags to your media files. This makes it easier to filter and organize content based on the language of the audio tracks, helping users quickly find movies or shows in their preferred language.
+A Jellyfin plugin that tags movies, episodes and series with the languages of their audio tracks, so you can filter your library by tag (for example "German" / "Deutsch").
 
-## Features
-
-- **Recursive Scanning:** Traverses your media directory and processes video files.
-- **Audio Track Analysis:** Uses `ffprobe` to inspect audio tracks and identify language based on configurable search patterns.
-- **NFO Tagging:** Automatically updates (or creates) a `movie.nfo` file in each media folder with language tags.
-- **Dry-Run Mode:** Preview the changes without modifying any files.
-- **Debug Mode:** Provides detailed output during processing.
-- **Configurable:** Easily extendable language settings for adding support for additional languages.
-
-## Example Screen
-![Colored Terminal Output](screen-dry-run.png)
+- **Reliable detection:** reads each audio stream's language tag (`ger`, `deu`, `de`, ...) first, then the stream title, the file name and the folder name. Commentary and audio-description tracks are ignored, and words like `CODEC` or `DEad` no longer match.
+- **Automatic:** new and changed movies and episodes are tagged shortly after Jellyfin adds them.
+- **Series too:** series are tagged from their episodes (any episode, every episode, or off).
+- **Configurable in the dashboard:** languages, detection layers, series mode, dry run.
+- **Safe:** only tags that belong to a configured language are ever added or removed; your own tags stay untouched.
 
 ## Requirements
 
-- **Python 3**  
-- **ffmpeg** (includes `ffprobe`)
-- **Jellyfin Server:**  
-  - Must have proper access rights to your media directory.
-  - Library must be configured to use and store metadata in NFO files.
+- Jellyfin Server **12.4** or newer
+- To keep the tags in `.nfo` files, enable the **Nfo** metadata saver in the library settings. The tags are stored in Jellyfin either way.
 
-## Usage
+## Install
 
-1. **Prepare Your Environment:**
-   - Ensure your Jellyfin server has proper access rights to the media directory so it can read the generated `movie.nfo` files.
-   - Configure your Jellyfin library to use and store metadata in NFO files.
+### Quick manual install
 
-2. **Run the Script:**
-
-   Open a terminal and run:
+1. Download `audio-language-tagger_<version>.zip` from the [releases](https://github.com/StilgarBF/jellyfin-tag-audio-lang/releases).
+2. Unpack it into a new folder named `AudioLangTagger_<version>` inside the Jellyfin `plugins` directory and restart Jellyfin. For a Debian/Ubuntu package install, including a Proxmox LXC:
 
    ```bash
-   python3 tag_media.py /path/to/media --language de --debug
+   sudo mkdir -p /var/lib/jellyfin/plugins/AudioLangTagger_0.1.0.0
+   sudo unzip audio-language-tagger_0.1.0.0.zip -d /var/lib/jellyfin/plugins/AudioLangTagger_0.1.0.0
+   sudo chown -R jellyfin:jellyfin /var/lib/jellyfin/plugins/AudioLangTagger_0.1.0.0
+   sudo systemctl restart jellyfin
    ```
 
-   - `/path/to/media`: The root directory of your media library.
-   - `--language de`: (Optional) Specifies the language configuration to use. The default is `de`.
-   - `--dry-run`: (Optional) Use this flag to simulate the changes without writing any files.
-   - `--debug`: (Optional) Enables detailed output to help you see what the script is doing.
+   Other installs use a different data directory (Docker: the `/config/plugins` volume).
 
-3. **Update Jellyfin Metadata:**
-   - After running the script, open your Jellyfin web interface.
-   - Navigate to your library’s menu (using the three dots).
-   - Click **"Refresh metadata"** and then **"Scan for new and updated files"** to load the new tags.
-   - You can now filter media by "tags" and "Deutsch"/"German"
+### Via plugin repository
 
-## Extending for Other Languages
+In Jellyfin: **Dashboard → Plugins → Repositories → +**, add
 
-The language-specific settings are stored at the top of the script in the `LANGUAGE_CONFIG` dictionary. For example, the default configuration for German (`de`) is:
+```
+https://raw.githubusercontent.com/StilgarBF/jellyfin-tag-audio-lang/main/manifest.json
+```
 
-   ```python
-   LANGUAGE_CONFIG = {
-       'de': {
-            'readable_name': "German",
-            'search_patterns': ["German", "Deutsch", "DE", "De "],
-            'tags_to_add': ["German", "Deutsch"]
-       }
-       # Add more languages here as needed.
-   }
-   ```
+then install **Audio Language Tagger** from the **Catalog** and restart Jellyfin.
 
-To add another language:
-- Add a new key with the language code.
-- Define its `readable_name`, `search_patterns`, and `tags_to_add`.
+## Use
 
-Remember to pass the new language code via the `--language` parameter when running the script.
+1. Open **Dashboard → Plugins → Audio Language Tagger**.
+2. Check the languages. German is preconfigured; add more with **Add language**.
+3. Tag the existing library: tick **Dry run**, **Save**, click **Scan library now**, and read what would change in **Dashboard → Logs**. When it looks right, untick **Dry run**, **Save** and scan again.
+4. From then on, new and changed items are tagged automatically.
+
+New and changed items are tagged automatically, but items that are already in the library are only tagged by the scan. Jellyfin's regular library scan does not touch unchanged files. The scan is also available as the scheduled task **Tag audio languages** (Dashboard → Scheduled Tasks) if you want to run it on a schedule.
+
+In Jellyfin, filter by the tags in a library under **Filters → Tags**.
+
+### How a language is detected
+
+Layers are checked from most to least reliable:
+
+1. the audio stream **language tag**, matched against the ISO 639 codes of the language (alpha-2 and both alpha-3 forms; `de-AT` counts as `de`)
+2. the audio stream **title**, as a whole word
+3. the **file name**, as a whole word
+4. the **folder name**, as a whole word
+
+File and folder names are by default only used when no audio stream has a known language, so an English file in a folder called "German Edition" is not tagged. Words of two letters or fewer (such as `DE`) match only in capitals. Tracks whose title contains "commentary", "kommentar" or "audio description" are skipped.
+
+## Build
+
+Requires the .NET 10 SDK.
+
+```bash
+dotnet build Jellyfin.Plugin.AudioLangTagger.slnx
+dotnet test Jellyfin.Plugin.AudioLangTagger.slnx
+```
+
+### Release
+
+1. Set the new `version` in `build.yaml` and describe it in `changelog`.
+2. Run `python3 scripts/package.py`. It runs the tests, builds the plugin, writes `artifacts/audio-language-tagger_<version>.zip` and updates `manifest.json`.
+3. Commit `manifest.json` and `build.yaml`, tag `v<version>`, push, and create a GitHub release for that tag with the zip as its asset. The name must match the `sourceUrl` in `manifest.json`.
 
 ## License
 
 This project is licensed under the [GNU General Public License v3 (GPLv3)](https://www.gnu.org/licenses/gpl-3.0.en.html).
-
----
-
-Happy tagging and enjoy a more organized Jellyfin media library!

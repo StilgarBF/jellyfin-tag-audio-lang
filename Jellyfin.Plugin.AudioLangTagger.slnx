@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="Jellyfin.Plugin.AudioLangTagger/Jellyfin.Plugin.AudioLangTagger.csproj" />
+  <Project Path="Jellyfin.Plugin.AudioLangTagger.Tests/Jellyfin.Plugin.AudioLangTagger.Tests.csproj" />
+</Solution>

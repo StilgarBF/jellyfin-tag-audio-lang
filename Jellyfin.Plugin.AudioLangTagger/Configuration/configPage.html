@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Audio Language Tagger</title>
+</head>
+<body>
+    <div id="AudioLangTaggerConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-select,emby-checkbox">
+        <div data-role="content">
+            <div class="content-primary">
+                <form id="AudioLangTaggerConfigForm">
+                    <h2>Audio Language Tagger</h2>
+                    <p>Adds language tags to movies, episodes and series based on their audio tracks. Use the scheduled task "Tag audio languages" (Dashboard &rarr; Scheduled Tasks) to tag the existing library.</p>
+
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label class="emby-checkbox-label">
+                            <input id="AutoTagNewItems" type="checkbox" is="emby-checkbox" />
+                            <span>Tag new and updated items automatically</span>
+                        </label>
+                    </div>
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label class="emby-checkbox-label">
+                            <input id="DryRun" type="checkbox" is="emby-checkbox" />
+                            <span>Dry run</span>
+                        </label>
+                        <div class="fieldDescription checkboxFieldDescription">Only write what would change to the server log; do not modify any item.</div>
+                    </div>
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label class="emby-checkbox-label">
+                            <input id="RemoveStaleTags" type="checkbox" is="emby-checkbox" />
+                            <span>Remove language tags that no longer match</span>
+                        </label>
+                        <div class="fieldDescription checkboxFieldDescription">Only tags listed in a language rule below are ever removed.</div>
+                    </div>
+
+                    <div class="selectContainer">
+                        <label class="selectLabel" for="SeriesRollUp">Series tags</label>
+                        <select is="emby-select" id="SeriesRollUp" class="emby-select-withcolor emby-select">
+                            <option value="Off">Do not tag series</option>
+                            <option value="AnyEpisode">Tag a series if any episode has the language</option>
+                            <option value="AllEpisodes">Tag a series only if every episode has the language</option>
+                        </select>
+                    </div>
+
+                    <h3>Existing library</h3>
+                    <p class="fieldDescription">New and changed items are tagged automatically. Items that are already in your library are only tagged when you run a scan. The scan uses the saved settings, so save first. Tip: enable "Dry run", save, scan, and check the server log before tagging for real.</p>
+                    <button is="emby-button" type="button" id="ScanNow" class="raised emby-button">
+                        <span>Scan library now</span>
+                    </button>
+                    <div id="ScanStatus" class="fieldDescription"></div>
+
+                    <h3>Detection</h3>
+                    <p class="fieldDescription">Layers are checked from the most reliable to the least reliable.</p>
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label class="emby-checkbox-label">
+                            <input id="UseStreamLanguage" type="checkbox" is="emby-checkbox" />
+                            <span>Audio stream language tag (for example ger, deu)</span>
+                        </label>
+                    </div>
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label class="emby-checkbox-label">
+                            <input id="UseStreamTitle" type="checkbox" is="emby-checkbox" />
+                            <span>Audio stream title</span>
+                        </label>
+                    </div>
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label class="emby-checkbox-label">
+                            <input id="UseFileName" type="checkbox" is="emby-checkbox" />
+                            <span>File name</span>
+                        </label>
+                    </div>
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label class="emby-checkbox-label">
+                            <input id="UseFolderName" type="checkbox" is="emby-checkbox" />
+                            <span>Folder name</span>
+                        </label>
+                    </div>
+                    <div class="checkboxContainer checkboxContainer-withDescription">
+                        <label class="emby-checkbox-label">
+                            <input id="NameHintsOnlyWhenLanguageUnknown" type="checkbox" is="emby-checkbox" />
+                            <span>Use file and folder names only when no audio stream has a known language</span>
+                        </label>
+                    </div>
+
+                    <h3>Languages</h3>
+                    <p class="fieldDescription">Separate several values with commas. Words match as whole words, ignoring case; words of two letters or fewer (such as DE) match only in capitals.</p>
+                    <div id="Rules"></div>
+                    <button is="emby-button" type="button" id="AddRule" class="raised emby-button">
+                        <span>Add language</span>
+                    </button>
+
+                    <div>
+                        <button is="emby-button" type="submit" class="raised button-submit block emby-button">
+                            <span>Save</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <script type="text/javascript">
+            (function () {
+                var pluginId = 'ba3e668f-205f-40b9-adba-61055c21c28c';
+                var page = document.querySelector('#AudioLangTaggerConfigPage');
+                var rulesContainer = page.querySelector('#Rules');
+                var checkboxes = ['AutoTagNewItems', 'DryRun', 'RemoveStaleTags'];
+                var detectionBoxes = ['UseStreamLanguage', 'UseStreamTitle', 'UseFileName', 'UseFolderName', 'NameHintsOnlyWhenLanguageUnknown'];
+                var ruleFields = [
+                    { key: 'Name', label: 'Name', list: false },
+                    { key: 'IsoCodes', label: 'ISO 639 language codes (for example de, deu, ger)', list: true },
+                    { key: 'TextPatterns', label: 'Words in titles and names (for example German, Deutsch, DE)', list: true },
+                    { key: 'Tags', label: 'Tags to add (for example German, Deutsch)', list: true }
+                ];
+
+                var scanTaskKey = 'AudioLangTaggerScan';
+                var scanTimer = null;
+                var scanStatus = page.querySelector('#ScanStatus');
+
+                function findScanTask() {
+                    return ApiClient.ajax({ type: 'GET', url: ApiClient.getUrl('ScheduledTasks'), dataType: 'json' }).then(function (tasks) {
+                        return tasks.filter(function (task) { return task.Key === scanTaskKey; })[0];
+                    });
+                }
+
+                function refreshScanStatus() {
+                    clearTimeout(scanTimer);
+                    return findScanTask().then(function (task) {
+                        if (!task) {
+                            scanStatus.textContent = 'Scan task not found.';
+                            return;
+                        }
+                        if (task.State === 'Running' || task.State === 'Cancelling') {
+                            scanStatus.textContent = 'Scanning... ' + Math.round(task.CurrentProgressPercentage || 0) + '%';
+                            scanTimer = setTimeout(refreshScanStatus, 2000);
+                        } else if (task.LastExecutionResult) {
+                            scanStatus.textContent = 'Last scan: ' + task.LastExecutionResult.Status + ' at ' +
+                                new Date(task.LastExecutionResult.EndTimeUtc).toLocaleString() + '. Details are in the server log.';
+                        } else {
+                            scanStatus.textContent = 'No scan has run yet.';
+                        }
+                    });
+                }
+
+                function splitList(text) {
+                    return text.split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+                }
+
+                function addRule(rule) {
+                    var card = document.createElement('div');
+                    card.className = 'rule';
+                    card.style.margin = '1em 0';
+                    card.style.padding = '0.5em 1em';
+                    card.style.border = '1px solid rgba(128,128,128,0.4)';
+                    card.style.borderRadius = '4px';
+
+                    // Static markup only (labels are constants); values are assigned below as properties.
+                    // document.createElement(tag, { is }) is not supported by the web client, so the
+                    // emby elements are declared with the "is" attribute in markup instead.
+                    card.innerHTML = ruleFields.map(function (field) {
+                        return '<div class="inputContainer">' +
+                            '<input is="emby-input" type="text" label="' + field.label + '" data-key="' + field.key + '"' + (field.list ? ' data-list="1"' : '') + ' />' +
+                            '</div>';
+                    }).join('') +
+                        '<button is="emby-button" type="button" class="raised emby-button removeRule"><span>Remove language</span></button>';
+
+                    card.querySelectorAll('input').forEach(function (input) {
+                        var value = rule[input.dataset.key];
+                        input.value = input.dataset.list ? (value || []).join(', ') : (value || '');
+                    });
+                    card.querySelector('.removeRule').addEventListener('click', function () { card.remove(); });
+
+                    rulesContainer.appendChild(card);
+                }
+
+                function readRules() {
+                    return Array.prototype.map.call(rulesContainer.querySelectorAll('.rule'), function (card) {
+                        var rule = {};
+                        card.querySelectorAll('input').forEach(function (input) {
+                            rule[input.dataset.key] = input.dataset.list ? splitList(input.value) : input.value.trim();
+                        });
+                        return rule;
+                    }).filter(function (rule) { return rule.Name && rule.Tags.length; });
+                }
+
+                page.addEventListener('pageshow', function () {
+                    Dashboard.showLoadingMsg();
+                    ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+                        checkboxes.forEach(function (id) { page.querySelector('#' + id).checked = !!config[id]; });
+                        detectionBoxes.forEach(function (id) { page.querySelector('#' + id).checked = !!config.Detection[id]; });
+                        page.querySelector('#SeriesRollUp').value = config.SeriesRollUp;
+                        rulesContainer.innerHTML = '';
+                        (config.Rules || []).forEach(addRule);
+                        refreshScanStatus();
+                        Dashboard.hideLoadingMsg();
+                    });
+                });
+
+                page.addEventListener('pagehide', function () { clearTimeout(scanTimer); });
+
+                page.querySelector('#ScanNow').addEventListener('click', function () {
+                    findScanTask().then(function (task) {
+                        if (!task) {
+                            scanStatus.textContent = 'Scan task not found.';
+                            return;
+                        }
+                        return ApiClient.ajax({ type: 'POST', url: ApiClient.getUrl('ScheduledTasks/Running/' + task.Id) }).then(refreshScanStatus);
+                    });
+                });
+
+                page.querySelector('#AddRule').addEventListener('click', function () {
+                    addRule({ Name: '', IsoCodes: [], TextPatterns: [], Tags: [] });
+                });
+
+                page.querySelector('#AudioLangTaggerConfigForm').addEventListener('submit', function (e) {
+                    Dashboard.showLoadingMsg();
+                    ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+                        checkboxes.forEach(function (id) { config[id] = page.querySelector('#' + id).checked; });
+                        config.Detection = config.Detection || {};
+                        detectionBoxes.forEach(function (id) { config.Detection[id] = page.querySelector('#' + id).checked; });
+                        config.SeriesRollUp = page.querySelector('#SeriesRollUp').value;
+                        config.Rules = readRules();
+                        ApiClient.updatePluginConfiguration(pluginId, config).then(function (result) {
+                            Dashboard.processPluginConfigurationUpdateResult(result);
+                        });
+                    });
+
+                    e.preventDefault();
+                    return false;
+                });
+            })();
+        </script>
+    </div>
+</body>
+</html>

@@ -1,0 +1,17 @@
+---
+name: "Audio Language Tagger"
+guid: "ba3e668f-205f-40b9-adba-61055c21c28c"
+version: "0.1.0.0"
+targetAbi: "12.4.0.0"
+framework: "net10.0"
+overview: "Tags movies, episodes and series with the languages of their audio tracks"
+description: >
+  Detects the audio languages of every video from its stream metadata and
+  adds language tags (for example German/Deutsch) automatically, including
+  for newly added media.
+category: "Metadata"
+owner: "StilgarBF"
+artifacts:
+- "Jellyfin.Plugin.AudioLangTagger.dll"
+changelog: >
+  Initial version.

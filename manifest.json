@@ -1,0 +1,20 @@
+[
+  {
+    "guid": "ba3e668f-205f-40b9-adba-61055c21c28c",
+    "versions": [
+      {
+        "version": "0.1.0.0",
+        "changelog": "Initial version.",
+        "targetAbi": "12.4.0.0",
+        "sourceUrl": "https://github.com/StilgarBF/jellyfin-tag-audio-lang/releases/download/v0.1.0.0/audio-language-tagger_0.1.0.0.zip",
+        "checksum": "1f88a9e5d00cea93105edc8f56ac56dd",
+        "timestamp": "2026-11-01T11:59:03Z"
+      }
+    ],
+    "name": "Audio Language Tagger",
+    "description": "Detects the audio languages of every video from its stream metadata and adds language tags (for example German/Deutsch) automatically, including for newly added media.",
+    "overview": "Tags movies, episodes and series with the languages of their audio tracks",
+    "owner": "StilgarBF",
+    "category": "Metadata"
+  }
+]

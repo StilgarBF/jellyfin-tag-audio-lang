@@ -29,6 +29,9 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
     public override string Name => "Audio Language Tagger";
 
     /// <inheritdoc />
+    public override string Description => "Tags movies, episodes and series with the languages of their audio tracks.";
+
+    /// <inheritdoc />
     public override Guid Id => Guid.Parse("ba3e668f-205f-40b9-adba-61055c21c28c");
 
     /// <summary>

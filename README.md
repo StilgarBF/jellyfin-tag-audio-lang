@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/logo.png" alt="Audio Language Tagger" width="128"></p>
+
 # Jellyfin Audio Language Tagger
 
 A Jellyfin plugin that tags movies, episodes and series with the languages of their audio tracks, so you can filter your library by tag (for example "German" / "Deutsch").
@@ -21,9 +23,9 @@ A Jellyfin plugin that tags movies, episodes and series with the languages of th
 2. Unpack it into a new folder named `AudioLangTagger_<version>` inside the Jellyfin `plugins` directory and restart Jellyfin. For a Debian/Ubuntu package install, including a Proxmox LXC:
 
    ```bash
-   sudo mkdir -p /var/lib/jellyfin/plugins/AudioLangTagger_0.1.0.0
-   sudo unzip audio-language-tagger_0.1.0.0.zip -d /var/lib/jellyfin/plugins/AudioLangTagger_0.1.0.0
-   sudo chown -R jellyfin:jellyfin /var/lib/jellyfin/plugins/AudioLangTagger_0.1.0.0
+   sudo mkdir -p /var/lib/jellyfin/plugins/AudioLangTagger_0.1.1.0
+   sudo unzip audio-language-tagger_0.1.1.0.zip -d /var/lib/jellyfin/plugins/AudioLangTagger_0.1.1.0
+   sudo chown -R jellyfin:jellyfin /var/lib/jellyfin/plugins/AudioLangTagger_0.1.1.0
    sudo systemctl restart jellyfin
    ```
 
